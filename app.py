@@ -5,7 +5,7 @@ import timm
 import numpy as np
 from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
-from mtcnn import MTCNN
+from facenet_pytorch import MTCNN
 
 # -----------------------------
 # Configuration
@@ -49,7 +49,13 @@ print("Model loaded successfully")
 # -----------------------------
 # Face Detector
 # -----------------------------
-detector = MTCNN()
+detector = MTCNN(
+    image_size=224,
+    margin=20,
+    keep_all=False,
+    device=device
+)
+
 
 # -----------------------------
 # Helper Functions
@@ -59,10 +65,13 @@ def allowed_file(filename):
 
 def extract_face(frame):
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    faces = detector.detect_faces(rgb)
-
-    if len(faces) == 0:
+    face = detector(rgb)
+    if face is None:
         return None
+    face = face.permute(1, 2, 0).cpu().numpy()
+    face = cv2.resize(face, (IMG_SIZE, IMG_SIZE))
+    return face
+
 
     x, y, w, h = faces[0]["box"]
     h_img, w_img, _ = rgb.shape
@@ -176,6 +185,7 @@ def analyze():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
